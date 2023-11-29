@@ -4,6 +4,8 @@ import numpy as np
 from shutil import copyfile
 from src.tfutils import *
 
+HIDDEN_DIM = 32
+
 class ModelTop(tf.keras.Model):
     def __init__(self, s_dim, pi_dim, tf_precision, precision):
         super(ModelTop, self).__init__()
@@ -16,18 +18,29 @@ class ModelTop(tf.keras.Model):
 
         self.s_dim = s_dim
         self.pi_dim = pi_dim
+        self.hidden_dim = HIDDEN_DIM
 
         self.qpi_net = tf.keras.Sequential([
               tf.keras.layers.InputLayer(input_shape=(s_dim,)),
-              tf.keras.layers.Dense(units=128, activation=tf.nn.relu, kernel_initializer='he_uniform'),
-              tf.keras.layers.Dense(units=128, activation=tf.nn.relu, kernel_initializer='he_uniform'),
-              tf.keras.layers.Dense(pi_dim),]) # No activation
+              tf.keras.layers.Dense(units=self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.Dense(units=self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.Dense(pi_dim), # No activation
+        ])
+
+    @tf.function
+    def reparameterize(self, mean, logvar):
+        eps = tf.random.normal(shape=mean.shape)
+        return eps * tf.exp(logvar * .5) + mean
 
     def encode_s(self, s0):
         logits_pi = self.qpi_net(s0)
         q_pi = tf.nn.softmax(logits_pi)
         log_q_pi = tf.math.log(q_pi+1e-20)
         return logits_pi, q_pi, log_q_pi
+
+        #q_pi_mean, q_pi_logvar = tf.split(self.qpi_net(s0), num_or_size_splits=2, axis=1)
+        #q_pi = self.reparameterize(q_pi_mean, q_pi_logvar)
+        #return q_pi, q_pi_mean, q_pi_logvar
 
 class ModelMid(tf.keras.Model):
     def __init__(self, s_dim, pi_dim, tf_precision, precision):
@@ -39,14 +52,15 @@ class ModelMid(tf.keras.Model):
 
         self.s_dim = s_dim
         self.pi_dim = pi_dim
+        self.hidden_dim = HIDDEN_DIM
 
         self.ps_net = tf.keras.Sequential([
               tf.keras.layers.InputLayer(input_shape=(pi_dim+s_dim,)),
-              tf.keras.layers.Dense(units=512, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.Dense(units=self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
               tf.keras.layers.Dropout(0.5),
-              tf.keras.layers.Dense(units=512, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.Dense(units=self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
               tf.keras.layers.Dropout(0.5),
-              tf.keras.layers.Dense(units=512, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.Dense(units=self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
               tf.keras.layers.Dropout(0.5),
               tf.keras.layers.Dense(s_dim + s_dim),]) # No activation
 
@@ -67,7 +81,7 @@ class ModelMid(tf.keras.Model):
         return ps1, ps1_mean, ps1_logvar
 
 class ModelDown(tf.keras.Model):
-    def __init__(self, s_dim, pi_dim, tf_precision, precision, colour_channels, resolution):
+    def __init__(self, s_dim, pi_dim, tf_precision, precision, o_dim):
         super(ModelDown, self).__init__()
 
         self.tf_precision = tf_precision
@@ -76,47 +90,33 @@ class ModelDown(tf.keras.Model):
 
         self.s_dim = s_dim
         self.pi_dim = pi_dim
-        self.colour_channels = colour_channels
-        self.resolution = resolution
-        if self.resolution == 64:
-            last_strides = 2
-        elif self.resolution == 32:
-            last_strides = 1
-        else:
-            exit('Unknown resolution..')
+        self.o_dim = o_dim
+        self.hidden_dim = HIDDEN_DIM
 
         self.qs_net = tf.keras.Sequential([
-              tf.keras.layers.InputLayer(input_shape=(self.resolution, self.resolution, self.colour_channels)),
-              tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=(2, 2), activation='relu', kernel_initializer='he_uniform'),
-              tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=(2, 2), activation='relu', kernel_initializer='he_uniform'),
-              tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2, 2), activation='relu', kernel_initializer='he_uniform'),
-              tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2, 2), activation='relu', kernel_initializer='he_uniform'),
-              tf.keras.layers.Flatten(),
-              tf.keras.layers.Dense(256, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.InputLayer(input_shape=(o_dim)),
+              tf.keras.layers.Dense(self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
               tf.keras.layers.Dropout(0.5),
-              tf.keras.layers.Dense(256, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.Dense(self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
               tf.keras.layers.Dropout(0.5),
-              tf.keras.layers.Dense(256, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.Dense(self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
               tf.keras.layers.Dropout(0.5),
-              tf.keras.layers.Dense(s_dim + s_dim),]) # No activation
+              tf.keras.layers.Dense(s_dim + s_dim), # No activation
+        ])
         self.po_net = tf.keras.Sequential([
               tf.keras.layers.InputLayer(input_shape=(s_dim,)),
-              tf.keras.layers.Dense(256, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.Dense(self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
               tf.keras.layers.Dropout(0.5),
-              tf.keras.layers.Dense(256, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.Dense(self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
               tf.keras.layers.Dropout(0.5),
-              tf.keras.layers.Dense(256, activation=tf.nn.relu, kernel_initializer='he_uniform'),
+              tf.keras.layers.Dense(self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
               tf.keras.layers.Dropout(0.5),
-              tf.keras.layers.Dense(units=16*16*64, activation=tf.nn.relu, kernel_initializer='he_uniform'),
-              tf.keras.layers.Dropout(0.5),
-              tf.keras.layers.Reshape(target_shape=(16, 16, 64)),
-              tf.keras.layers.Conv2DTranspose(filters=64, kernel_size=3, strides=(1, 1), padding="SAME", activation='relu', kernel_initializer='he_uniform'),
-              tf.keras.layers.Conv2DTranspose(filters=64, kernel_size=3, strides=(2, 2), padding="SAME", activation='relu', kernel_initializer='he_uniform'),
-              tf.keras.layers.Conv2DTranspose(filters=32, kernel_size=3, strides=(last_strides, last_strides), padding="SAME", activation='relu', kernel_initializer='he_uniform'),
-              tf.keras.layers.Conv2DTranspose(filters=self.colour_channels, kernel_size=3, strides=(1, 1), padding="SAME", activation='sigmoid', kernel_initializer='he_uniform'),])
+              tf.keras.layers.Dense(o_dim), # No activation
+        ])
 
     @tf.function
     def reparameterize(self, mean, logvar):
+        """ returns a sample """
         eps = tf.random.normal(shape=mean.shape)
         return eps * tf.exp(logvar * .5) + mean
 
@@ -139,30 +139,37 @@ class ModelDown(tf.keras.Model):
 
 
 class ActiveInferenceModel:
-    def __init__(self, s_dim, pi_dim, gamma, beta_s, beta_o, colour_channels=1, resolution=64):
+    def __init__(self, s_dim, pi_dim, gamma, beta_s, beta_o, o_dim):
 
         self.tf_precision = tf.float32
         self.precision = 'float32'
 
         self.s_dim = s_dim
         self.pi_dim = pi_dim
+        self.o_dim = o_dim
+
+        # TODO: fix this
+        self.o_desired = np.array([ 20.0, 0 ]) # hard coded for now
+
         tf.keras.backend.set_floatx(self.precision)
 
         if self.pi_dim > 0:
             self.model_top = ModelTop(s_dim, pi_dim, self.tf_precision, self.precision)
             self.model_mid = ModelMid(s_dim, pi_dim, self.tf_precision, self.precision)
-        self.model_down = ModelDown(s_dim, pi_dim, self.tf_precision, self.precision, colour_channels, resolution)
+        self.model_down = ModelDown(s_dim, pi_dim, self.tf_precision, self.precision, o_dim)
 
         self.model_down.beta_s = tf.Variable(beta_s, trainable=False, name="beta_s")
         self.model_down.gamma = tf.Variable(gamma, trainable=False, name="gamma")
         self.model_down.beta_o = tf.Variable(beta_o, trainable=False, name="beta_o")
-        self.pi_one_hot = tf.Variable([[1.0,0.0,0.0,0.0],
-                                       [0.0,1.0,0.0,0.0],
-                                       [0.0,0.0,1.0,0.0],
-                                       [0.0,0.0,0.0,1.0]], trainable=False, dtype=self.tf_precision)
-        self.pi_one_hot_3 = tf.Variable([[1.0,0.0,0.0],
-                                         [0.0,1.0,0.0],
-                                         [0.0,0.0,1.0]], trainable=False, dtype=self.tf_precision)
+        self.pi_one_hot = tf.Variable(tf.eye(self.pi_dim), trainable=False, dtype=self.tf_precision)
+        #self.pi_one_hot = tf.Variable([[1.0,0.0,0.0,0.0],
+        #                               [0.0,1.0,0.0,0.0],
+        #                               [0.0,0.0,1.0,0.0],
+        #                               [0.0,0.0,0.0,1.0]], trainable=False,
+        #                               dtype=self.tf_precision)
+
+        # pi one hot, using tf diagnal then making a matrix
+
 
 
     def save_weights(self, folder_chp):
@@ -205,10 +212,14 @@ class ActiveInferenceModel:
         return stats, optimizers
 
     def check_reward(self, o):
-        if self.model_down.resolution == 64:
-            return tf.reduce_mean(calc_reward(o),axis=[1,2,3]) * 10.0
-        elif self.model_down.resolution == 32:
-            return tf.reduce_sum(calc_reward_animalai(o), axis=[1,2,3])
+        def calc_reward(o):
+            return (o - self.o_desired)**2
+
+        return calc_reward(o)
+        #if self.model_down.resolution == 64:
+        #    return tf.reduce_mean(calc_reward(o),axis=[1,2,3]) * 10.0
+        #elif self.model_down.resolution == 32:
+        #    return tf.reduce_sum(calc_reward_animalai(o), axis=[1,2,3])
 
     @tf.function
     def imagine_future_from_o(self, o0, pi):
@@ -233,7 +244,11 @@ class ActiveInferenceModel:
         qs0_mean, qs0_logvar = self.model_down.encoder(o)
         qs0 = self.model_down.reparameterize(qs0_mean, qs0_logvar)
 
-        sum_terms = [tf.zeros([o.shape[0]], self.tf_precision), tf.zeros([o.shape[0]], self.tf_precision), tf.zeros([o.shape[0]], self.tf_precision)]
+        sum_terms = [
+            tf.zeros([o.shape[0]], self.tf_precision),
+            tf.zeros([o.shape[0]], self.tf_precision),
+            tf.zeros([o.shape[0]], self.tf_precision)
+        ]
         sum_G = tf.zeros([o.shape[0]], self.tf_precision)
 
         # Predict s_t+1 for various policies

@@ -45,7 +45,7 @@ except: print('Folder chp creation error')
 
 games = Game(args.batch)
 game_test = Game(1)
-model = ActiveInferenceModel(s_dim=s_dim, pi_dim=pi_dim, gamma=gamma, beta_s=beta_s, beta_o=beta_o, colour_channels=1, resolution=64)
+model = ActiveInferenceModel(s_dim=s_dim, pi_dim=pi_dim, gamma=gamma, beta_s=beta_s, beta_o=beta_o, o_dim=5)
 
 stats_start = {'F':[], 'F_top':[], 'F_mid':[], 'F_down':[], 'mse_o':[], 'TC':[], 'kl_div_s':[],
    'kl_div_s_anal':[], 'omega':[], 'learning_rate':[], 'current_lr':[], 'mse_r':[],
