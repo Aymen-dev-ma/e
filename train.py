@@ -27,7 +27,8 @@ c: This moves the steepness of the sigmoid
 d: This is the minimum omega (when sigmoid is zero)
 '''
 var_a = 1.0;         var_b = 25.0;          var_c = 5.0;         var_d = 1.5
-s_dim = 10;          o_dim = 3;             pi_dim = 5;          beta_s = 1.0;        beta_o = 1.0;
+s_dim = 10;          o_dim = 3;             pi_dim = 5;
+beta_s = 1.0;        beta_o = 1.0;
 gamma = 0.0;         gamma_rate = 0.01;     gamma_max = 0.8;     gamma_delay = 30
 deepness = 1;        samples = 1;           repeats = 5
 l_rate_top = 1e-04;  l_rate_mid = 1e-04;    l_rate_down = 0.001
@@ -68,10 +69,12 @@ else:
     start_epoch = 1
     optimizers = {}
 
+AdamOptimizer = tf.keras.optimizers.legacy.Adam # use legacy for mac support
+
 if optimizers == {}:
-    optimizers['top'] = tf.keras.optimizers.Adam(learning_rate=l_rate_top)
-    optimizers['mid'] = tf.keras.optimizers.Adam(learning_rate=l_rate_mid)
-    optimizers['down'] = tf.keras.optimizers.Adam(learning_rate=l_rate_down)
+    optimizers['top'] = AdamOptimizer(learning_rate=l_rate_top)
+    optimizers['mid'] = AdamOptimizer(learning_rate=l_rate_mid)
+    optimizers['down'] = AdamOptimizer(learning_rate=l_rate_down)
 
 start_time = time.time()
 for epoch in range(start_epoch, epochs + 1):
@@ -80,8 +83,11 @@ for epoch in range(start_epoch, epochs + 1):
 
     train_scores = np.zeros(ROUNDS)
     for i in range(ROUNDS):
+        print("GAME ROUND", i)
         # -- MAKE TRAINING DATA FOR THIS BATCH ---------------------------------
-        games.randomize_environment_all()
+        games.randomize_environment_all() # why is it randomising the whole thing each round?
+        if i > 0:
+            print("it gonna break now")
         o0, o1, pi0, log_Ppi = u.make_batch_dsprites_active_inference(games=games, model=model, deepness=deepness, samples=samples, calc_mean=True, repeats=repeats)
 
         # -- TRAIN TOP LAYER ---------------------------------------------------

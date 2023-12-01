@@ -245,6 +245,7 @@ class ActiveInferenceModel:
         one of the four actions continuously..
         """
         # Calculate current s_t
+        print("Encoding now:")
         qs0_mean, qs0_logvar = self.model_down.encoder(o)
         qs0 = self.model_down.reparameterize(qs0_mean, qs0_logvar)
 

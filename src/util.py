@@ -63,14 +63,16 @@ def make_batch_dsprites_active_inference(
         calc_mean: bool = False,
         repeats: int = 1,
     ):
+    print(games.games_no)
     o0 = games.current_frame_all()
     # TODO: Find out why is this Magic Number 4? should this be pi_dim?
     #o0_repeated = o0.repeat(4,0) # The 0th dimension
     o0_repeated = o0.repeat(model.pi_dim, 0)
 
-
     pi_one_hot = np.eye(model.pi_dim, dtype=np.float32)
     pi_repeated = np.tile(pi_one_hot,(games.games_no, 1))
+    print("initial observations:")
+    print(o0)
 
     sum_G, sum_terms, po2 = model.calculate_G_repeated(o0_repeated, pi_repeated, steps=deepness, samples=samples, calc_mean=calc_mean)
     terms1 = -sum_terms[0]
@@ -81,7 +83,6 @@ def make_batch_dsprites_active_inference(
 
     Ppi, log_Ppi = softmax_multi_with_log(-sum_G.numpy(), model.pi_dim) # Full active inference agent
 
-    print(Ppi)
     pi_choices = np.array([np.random.choice(model.pi_dim, p=Ppi[i]) for i in range(games.games_no)])
 
     # One hot version..
@@ -89,7 +90,8 @@ def make_batch_dsprites_active_inference(
     pi0[np.arange(games.games_no), pi_choices] = 1.0
 
     # Apply the actions!
-    for i in range(games.games_no): games.pi_to_action(pi_choices[i], i, repeats=repeats)
+    for i in range(games.games_no):
+        games.pi_to_action(pi_choices[i], i, repeats=repeats)
     o1 = games.current_frame_all()
 
     return o0, o1, pi0, log_Ppi
