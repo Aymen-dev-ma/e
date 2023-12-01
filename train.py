@@ -83,12 +83,15 @@ for epoch in range(start_epoch, epochs + 1):
 
     train_scores = np.zeros(ROUNDS)
     for i in range(ROUNDS):
+        # TODO: fix the code then delete these statements
         print("GAME ROUND", i)
+        tf.config.run_functions_eagerly(True)
+
         # -- MAKE TRAINING DATA FOR THIS BATCH ---------------------------------
         games.randomize_environment_all() # why is it randomising the whole thing each round?
-        if i > 0:
-            print("it gonna break now")
+        print("make sprites")
         o0, o1, pi0, log_Ppi = u.make_batch_dsprites_active_inference(games=games, model=model, deepness=deepness, samples=samples, calc_mean=True, repeats=repeats)
+        print("training")
 
         # -- TRAIN TOP LAYER ---------------------------------------------------
         qs0,_,_ = model.model_down.encoder_with_sample(o0)
@@ -98,6 +101,7 @@ for epoch in range(start_epoch, epochs + 1):
         current_omega = loss.compute_omega(D_KL_pi, a=var_a, b=var_b, c=var_c, d=var_d).reshape(-1,1)
 
         # -- TRAIN MIDDLE LAYER ------------------------------------------------
+        print("second encoding")
         qs1_mean, qs1_logvar = model.model_down.encoder(o1)
         ps1_mean, ps1_logvar = loss.train_model_mid(model_mid=model.model_mid, s0=qs0, qs1_mean=qs1_mean, qs1_logvar=qs1_logvar, Ppi_sampled=pi0, omega=current_omega, optimizer=optimizers['mid'])
 

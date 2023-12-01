@@ -71,7 +71,9 @@ class ModelMid(tf.keras.Model):
 
     @tf.function
     def transition(self, pi, s0):
+        # TODO: change sigmoid(logvar) to something better
         mean, logvar = tf.split(self.ps_net(tf.concat([pi,s0],1)), num_or_size_splits=2, axis=1)
+        logvar = tf.sigmoid(logvar)
         return mean, logvar
 
     @tf.function
@@ -123,7 +125,7 @@ class ModelDown(tf.keras.Model):
     @tf.function
     def encoder(self, o):
         print("DOING ENCODING")
-        print(o)
+        print(o[:10, :])
         grad_check = tf.debugging.check_numerics(self.qs_net(o), 'check_numerics caught bad temptemptemptemptemp3')
         mean_s, logvar_s = tf.split(self.qs_net(o), num_or_size_splits=2, axis=1)
         return mean_s, logvar_s
@@ -245,7 +247,6 @@ class ActiveInferenceModel:
         one of the four actions continuously..
         """
         # Calculate current s_t
-        print("Encoding now:")
         qs0_mean, qs0_logvar = self.model_down.encoder(o)
         qs0 = self.model_down.reparameterize(qs0_mean, qs0_logvar)
 
@@ -316,8 +317,11 @@ class ActiveInferenceModel:
         term0 = tf.zeros([s0.shape[0]], self.tf_precision)
         term1 = tf.zeros([s0.shape[0]], self.tf_precision)
         for _ in range(samples):
+            print("input state s0:", s0[:10, :])
             ps1, ps1_mean, ps1_logvar = self.model_mid.transition_with_sample(pi0, s0)
+            print("predicted state ps1:", ps1[:10, :])
             po1 = self.model_down.decoder(ps1)
+            print("predicted observation po1:", po1[:10, :])
             qs1, _, qs1_logvar = self.model_down.encoder_with_sample(po1)
 
             # E [ log P(o|pi) ]

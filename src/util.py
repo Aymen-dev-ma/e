@@ -63,16 +63,12 @@ def make_batch_dsprites_active_inference(
         calc_mean: bool = False,
         repeats: int = 1,
     ):
-    print(games.games_no)
     o0 = games.current_frame_all()
-    # TODO: Find out why is this Magic Number 4? should this be pi_dim?
     #o0_repeated = o0.repeat(4,0) # The 0th dimension
     o0_repeated = o0.repeat(model.pi_dim, 0)
 
     pi_one_hot = np.eye(model.pi_dim, dtype=np.float32)
     pi_repeated = np.tile(pi_one_hot,(games.games_no, 1))
-    print("initial observations:")
-    print(o0)
 
     sum_G, sum_terms, po2 = model.calculate_G_repeated(o0_repeated, pi_repeated, steps=deepness, samples=samples, calc_mean=calc_mean)
     terms1 = -sum_terms[0]
