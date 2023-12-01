@@ -77,12 +77,12 @@ def make_batch_dsprites_active_inference(
     # Shape now is (games_no,4)
     #Ppi, log_Ppi = softmax_multi_with_log(-terms1.numpy(), 4) # For agent driven just by reward
     #Ppi, log_Ppi = softmax_multi_with_log(-terms12.numpy(), 4) # For agent driven by terms 1 and 2
-    Ppi, log_Ppi = softmax_multi_with_log(-sum_G.numpy(), 4) # Full active inference agent
+    Ppi, log_Ppi = softmax_multi_with_log(-sum_G.numpy(), model.pi_dim) # Full active inference agent
 
-    pi_choices = np.array([np.random.choice(4,p=Ppi[i]) for i in range(games.games_no)])
+    pi_choices = np.array([np.random.choice(model.pi_dim, p=Ppi[i]) for i in range(games.games_no)])
 
     # One hot version..
-    pi0 = np.zeros((games.games_no,4), dtype=np_precision)
+    pi0 = np.zeros((games.games_no, model.pi_dim), dtype=np_precision)
     pi0[np.arange(games.games_no), pi_choices] = 1.0
 
     # Apply the actions!
