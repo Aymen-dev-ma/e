@@ -3,3 +3,4 @@ matplotlib
 scipy
 tensorflow-gpu>=2.0.0
 opencv-python
+noise
