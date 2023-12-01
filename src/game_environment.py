@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from src.util import np_precision, generate_perlin_noise, NoiseClass
+from src.util import np_precision, NoiseClass
 
 REWARD_IDX = 4
 
@@ -24,7 +24,7 @@ class Game:
         self.s_bases = None # hope this isn't used!!
 
         # Obesrvation Dimensions
-        self.o_names = ["indoor_temp", "agent_power"]
+        self.o_names = ["indoor_temp", "agent_power", "reward"]
         self.o_sizes = np.ones_like(self.o_names, dtype=float)
         self.o_dim   = self.o_sizes.size
         self.o_key   = dict([(key, idx) for (idx, key) in enumerate(self.o_names)])
@@ -32,7 +32,7 @@ class Game:
         self.pi_dim  = pi_dim
 
         self.games_no = number_of_games
-        self.weather = np.zeros((self.games_no, self.game_length))
+        self.weather = np.array([NoiseClass() for _ in range(self.games_no)])
         self.current_s = np.zeros((self.games_no, self.s_dim), dtype=np_precision)
         self.last_r = np.zeros(self.games_no, dtype=np_precision)
         self.new_image_all()
@@ -43,6 +43,8 @@ class Game:
         s = np.zeros(self.s_dim, dtype=np_precision)
         for s_i, s_size in enumerate(self.s_sizes):
             s[s_i] = np.random.randint(s_size)
+        s[self.s_key["outdoor_temp"]] = NoiseClass().next()
+        s[self.s_key["indoor_temp"]] = NoiseClass().next()
         return s
 
     def sample_s_all(self): # Reward is zero after this!

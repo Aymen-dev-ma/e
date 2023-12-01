@@ -1,7 +1,8 @@
 import numpy as np
 import pickle
-from .game_environment import Game
-from .tfmodel import ActiveInferenceModel
+from noise import snoise2
+#from .game_environment import Game
+#from .tfmodel import ActiveInferenceModel
 
 np_precision = np.float32
 
@@ -55,8 +56,8 @@ def softmax_multi_with_log(x, single_values=4, eps=1e-20, temperature=10.0):
     return SM, logSM
 
 def make_batch_dsprites_active_inference(
-        games: Game,
-        model: ActiveInferenceModel,
+        games,
+        model,
         deepness: int = 10,
         samples: int = 5,
         calc_mean: bool = False,
@@ -68,7 +69,7 @@ def make_batch_dsprites_active_inference(
     o0_repeated = o0.repeat(model.pi_dim, 0)
 
 
-    pi_one_hot = np.eye(model.pi_dim)
+    pi_one_hot = np.eye(model.pi_dim, dtype=np.float32)
     pi_repeated = np.tile(pi_one_hot,(games.games_no, 1))
 
     sum_G, sum_terms, po2 = model.calculate_G_repeated(o0_repeated, pi_repeated, steps=deepness, samples=samples, calc_mean=calc_mean)
@@ -77,8 +78,10 @@ def make_batch_dsprites_active_inference(
     # Shape now is (games_no,4)
     #Ppi, log_Ppi = softmax_multi_with_log(-terms1.numpy(), 4) # For agent driven just by reward
     #Ppi, log_Ppi = softmax_multi_with_log(-terms12.numpy(), 4) # For agent driven by terms 1 and 2
+
     Ppi, log_Ppi = softmax_multi_with_log(-sum_G.numpy(), model.pi_dim) # Full active inference agent
 
+    print(Ppi)
     pi_choices = np.array([np.random.choice(model.pi_dim, p=Ppi[i]) for i in range(games.games_no)])
 
     # One hot version..
@@ -96,53 +99,6 @@ def compare_reward(o1, po1):
     logpo1 = np.square(o1 - po1).mean()
     #logpo1 = np.square(o1[:,0:3,0:64,:] - po1[:,0:3,0:64,:]).mean(axis=(0,1,2,3))
     return logpo1
-
-def generate_perlin_noise(n_iter, timescale, baseline=20, scaling=5):
-    class PerlinNoiseGenerator:
-        def __init__(self):
-            self.baseline  = baseline
-            self.scaling   = scaling
-            self.n_iter    = n_iter
-            self.timescale = timescale
-
-        def fade(self, t):
-            """Fade function as defined by Ken Perlin."""
-            return t * t * t * (t * (t * 6 - 15) + 10)
-
-        def lerp(self, a, b, x):
-            """Linear interpolation."""
-            return a + x * (b - a)
-
-        def grad(self, hash_value, x):
-            """Gradient function."""
-            h = hash_value & 15
-            grad = 1 + (h & 7)  # Gradient value is one of 1, 2, ..., 8
-            return (grad * x)  # Compute the dot product
-
-        def generate(self):
-            # Create a permutation array
-            p = np.arange(256, dtype=int)
-            np.random.shuffle(p)
-            p = np.stack([p, p]).flatten()  # Duplicate to avoid overflow
-
-            def perlin(x):
-                """Generate Perlin noise for input x."""
-                X = int(x) & 255
-                x -= int(x)
-                u = self.fade(x)
-
-                a = p[X]
-                b = p[X + 1]
-
-                return self.lerp(self.grad(a, x), self.grad(b, x - 1), u)
-
-            # Example of using the Perlin noise generator to produce temperature variations
-            time_steps = np.linspace(0, self.timescale, self.n_iter)
-            outdoor_temperatures = [20 + self.scaling*perlin(t) for t in time_steps]
-            return time_steps, outdoor_temperatures
-
-    time_steps, outdoor_temps = PerlinNoiseGenerator().generate()
-    return time_steps, outdoor_temps
 
 class NoiseClass:
     def __init__(self, scale=100, x_offset=None, mean=20, dev=10):

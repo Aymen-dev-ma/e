@@ -122,6 +122,8 @@ class ModelDown(tf.keras.Model):
 
     @tf.function
     def encoder(self, o):
+        print("DOING ENCODING")
+        print(o)
         grad_check = tf.debugging.check_numerics(self.qs_net(o), 'check_numerics caught bad temptemptemptemptemp3')
         mean_s, logvar_s = tf.split(self.qs_net(o), num_or_size_splits=2, axis=1)
         return mean_s, logvar_s
@@ -149,7 +151,8 @@ class ActiveInferenceModel:
         self.o_dim = o_dim
 
         # TODO: fix this
-        self.o_desired = np.array([ 20.0, 0 ]) # hard coded for now
+        self.o_names = ["indoor_temperature", "agent_power", "reward"]
+        self.o_desired = tf.constant([ 20.0, 0.0, 0.0 ]) # hard coded for now
 
         tf.keras.backend.set_floatx(self.precision)
 
@@ -213,7 +216,8 @@ class ActiveInferenceModel:
 
     def check_reward(self, o):
         def calc_reward(o):
-            return (o - self.o_desired)**2
+            #return (o - self.o_desired)**2
+            return tf.reduce_sum((o - self.o_desired)**2, axis=1)
 
         return calc_reward(o)
         #if self.model_down.resolution == 64:
@@ -329,11 +333,11 @@ class ActiveInferenceModel:
         for _ in range(samples):
             # Term 2.1: Sampling different thetas, i.e. sampling different ps_mean/logvar with dropout!
             po1_temp1 = self.model_down.decoder(self.model_mid.transition_with_sample(pi0, s0)[0])
-            term2_1 += tf.reduce_sum(entropy_bernoulli(po1_temp1),axis=[1,2,3])
+            term2_1 += tf.reduce_sum(entropy_obs(po1_temp1),axis=[1])
 
             # Term 2.2: Sampling different s with the same theta, i.e. just the reparametrization trick!
             po1_temp2 = self.model_down.decoder(self.model_down.reparameterize(ps1_mean, ps1_logvar))
-            term2_2 += tf.reduce_sum(entropy_bernoulli(po1_temp2),axis=[1,2,3])
+            term2_2 += tf.reduce_sum(entropy_obs(po1_temp2),axis=[1])
         term2_1 /= float(samples)
         term2_2 /= float(samples)
 
@@ -360,11 +364,11 @@ class ActiveInferenceModel:
 
         # Term 2.1: Sampling different thetas, i.e. sampling different ps_mean/logvar with dropout!
         po1_temp1 = self.model_down.decoder(self.model_mid.transition_with_sample(pi0, s0)[1])
-        term2_1 = tf.reduce_sum(entropy_bernoulli(po1_temp1),axis=[1,2,3])
+        term2_1 = tf.reduce_sum(entropy_obs(po1_temp1),axis=[1])
 
         # Term 2.2: Sampling different s with the same theta, i.e. just the reparametrization trick!
         po1_temp2 = self.model_down.decoder(self.model_down.reparameterize(ps1_mean, ps1_logvar))
-        term2_2 = tf.reduce_sum(entropy_bernoulli(po1_temp2),axis=[1,2,3])
+        term2_2 = tf.reduce_sum(entropy_obs(po1_temp2),axis=[1])
 
         # E [ log [ H(o|s,th,pi) ] - E [ H(o|s,pi) ]
         term2 = term2_1 - term2_2
@@ -388,11 +392,11 @@ class ActiveInferenceModel:
 
         #  Term 2.1: Sampling different thetas, i.e. sampling different ps_mean/logvar with dropout!
         po1_temp1 = self.model_down.decoder(self.model_mid.transition_with_sample(pi0_traj, s0_traj)[0])
-        term2_1 = tf.reduce_sum(entropy_bernoulli(po1_temp1),axis=[1,2,3])
+        term2_1 = tf.reduce_sum(entropy_obs(po1_temp1),axis=[1,2,3])
 
         # Term 2.2: Sampling different s with the same theta, i.e. just the reparametrization trick!
         po1_temp2 = self.model_down.decoder(self.model_down.reparameterize(ps1_mean_traj, ps1_logvar_traj))
-        term2_2 = tf.reduce_sum(entropy_bernoulli(po1_temp2),axis=[1,2,3])
+        term2_2 = tf.reduce_sum(entropy_obs(po1_temp2),axis=[1,2,3])
 
         # E [ log [ H(o|s,th,pi) ] - E [ H(o|s,pi) ]
         term2 = term2_1 - term2_2

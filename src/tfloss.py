@@ -48,8 +48,10 @@ def compute_loss_down(model_down, o1, ps1_mean, ps1_logvar, omega, displacement 
 
     # TERM: Eq[log P(o1|s1)]
     # --------------------------------------------------------------------------
-    bin_cross_entr = o1 * tf.math.log(displacement + po1) + (1 - o1) * tf.math.log(displacement + 1 - po1) # Binary Cross Entropy
-    logpo1_s1 = tf.reduce_sum(bin_cross_entr, axis=[1,2,3])
+    # TODO: calculate real entropy?
+    #bin_cross_entr = o1 * tf.math.log(displacement + po1) + (1 - o1) * tf.math.log(displacement + 1 - po1) # Binary Cross Entropy
+    entropy = tf.square(po1 - o1)
+    logpo1_s1 = tf.reduce_sum(entropy, axis=[1])
 
     # TERM: Eqpi D_kl[Q(s1)||N(0.0,1.0)]
     # --------------------------------------------------------------------------

@@ -27,7 +27,7 @@ c: This moves the steepness of the sigmoid
 d: This is the minimum omega (when sigmoid is zero)
 '''
 var_a = 1.0;         var_b = 25.0;          var_c = 5.0;         var_d = 1.5
-s_dim = 10;          pi_dim = 4;            beta_s = 1.0;        beta_o = 1.0;
+s_dim = 10;          o_dim = 3;             pi_dim = 5;          beta_s = 1.0;        beta_o = 1.0;
 gamma = 0.0;         gamma_rate = 0.01;     gamma_max = 0.8;     gamma_delay = 30
 deepness = 1;        samples = 1;           repeats = 5
 l_rate_top = 1e-04;  l_rate_mid = 1e-04;    l_rate_down = 0.001
@@ -45,7 +45,7 @@ except: print('Folder chp creation error')
 
 games = Game(args.batch)
 game_test = Game(1)
-model = ActiveInferenceModel(s_dim=s_dim, pi_dim=pi_dim, gamma=gamma, beta_s=beta_s, beta_o=beta_o, o_dim=5)
+model = ActiveInferenceModel(s_dim=s_dim, pi_dim=pi_dim, gamma=gamma, beta_s=beta_s, beta_o=beta_o, o_dim=3)
 
 stats_start = {'F':[], 'F_top':[], 'F_mid':[], 'F_down':[], 'mse_o':[], 'TC':[], 'kl_div_s':[],
    'kl_div_s_anal':[], 'omega':[], 'learning_rate':[], 'current_lr':[], 'mse_r':[],
