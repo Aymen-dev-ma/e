@@ -7,6 +7,7 @@ from src.tfutils import *
 HIDDEN_DIM = 32
 
 class ModelTop(tf.keras.Model):
+    """ Computes the policy based on the current hidden state"""
     def __init__(self, s_dim, pi_dim, tf_precision, precision):
         super(ModelTop, self).__init__()
         # For activation function we used ReLU.
@@ -27,10 +28,10 @@ class ModelTop(tf.keras.Model):
               tf.keras.layers.Dense(pi_dim), # No activation
         ])
 
-    @tf.function
-    def reparameterize(self, mean, logvar):
-        eps = tf.random.normal(shape=mean.shape)
-        return eps * tf.exp(logvar * .5) + mean
+    # @tf.function
+    # def reparameterize(self, mean, logvar):
+    #    eps = tf.random.normal(shape=mean.shape)
+    #    return eps * tf.exp(logvar * .5) + mean
 
     def encode_s(self, s0):
         logits_pi = self.qpi_net(s0)
@@ -43,6 +44,7 @@ class ModelTop(tf.keras.Model):
         #return q_pi, q_pi_mean, q_pi_logvar
 
 class ModelMid(tf.keras.Model):
+    """ Predict next hidden state (t+1) based on current hidden state (t) and action"""
     def __init__(self, s_dim, pi_dim, tf_precision, precision):
         super(ModelMid, self).__init__()
 
@@ -66,13 +68,15 @@ class ModelMid(tf.keras.Model):
 
     @tf.function
     def reparameterize(self, mean, logvar):
+        """ Convert mean + logvar normal distribution -> sample from the distribution"""
         eps = tf.random.normal(shape=mean.shape)
         return eps * tf.exp(logvar * .5) + mean
 
     @tf.function
     def transition(self, pi, s0):
-        # TODO: change sigmoid(logvar) to something better
         mean, logvar = tf.split(self.ps_net(tf.concat([pi,s0],1)), num_or_size_splits=2, axis=1)
+        # TODO: check if need to change to sigmoid(logvar) or something better
+        #log(stdev^2)
         logvar = tf.sigmoid(logvar)
         return mean, logvar
 
@@ -83,6 +87,7 @@ class ModelMid(tf.keras.Model):
         return ps1, ps1_mean, ps1_logvar
 
 class ModelDown(tf.keras.Model):
+    """ Convert between hidden state <--> observations"""
     def __init__(self, s_dim, pi_dim, tf_precision, precision, o_dim):
         super(ModelDown, self).__init__()
 
@@ -102,7 +107,6 @@ class ModelDown(tf.keras.Model):
               tf.keras.layers.Dense(self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
               tf.keras.layers.Dropout(0.5),
               tf.keras.layers.Dense(self.hidden_dim, activation=tf.nn.relu, kernel_initializer='he_uniform'),
-              tf.keras.layers.Dropout(0.5),
               tf.keras.layers.Dense(s_dim + s_dim), # No activation
         ])
         self.po_net = tf.keras.Sequential([
@@ -124,8 +128,10 @@ class ModelDown(tf.keras.Model):
 
     @tf.function
     def encoder(self, o):
-        print("DOING ENCODING")
-        print(o[:10, :])
+        #print("DOING ENCODING")
+        #print(o[:, :])
+        #print(self.qs_net.get_weights())
+        # TODO: why does this crash???
         grad_check = tf.debugging.check_numerics(self.qs_net(o), 'check_numerics caught bad temptemptemptemptemp3')
         mean_s, logvar_s = tf.split(self.qs_net(o), num_or_size_splits=2, axis=1)
         return mean_s, logvar_s

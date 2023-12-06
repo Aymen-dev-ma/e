@@ -93,6 +93,10 @@ for epoch in range(start_epoch, epochs + 1):
         o0, o1, pi0, log_Ppi = u.make_batch_dsprites_active_inference(games=games, model=model, deepness=deepness, samples=samples, calc_mean=True, repeats=repeats)
         print("training")
 
+        print("Transition States")
+        print(o0[..., 0])
+        print(o1[..., 0])
+
         # -- TRAIN TOP LAYER ---------------------------------------------------
         qs0,_,_ = model.model_down.encoder_with_sample(o0)
         D_KL_pi = loss.train_model_top(model_top=model.model_top, s=qs0, log_Ppi=log_Ppi, optimizer=optimizers['top'])
