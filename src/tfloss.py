@@ -101,6 +101,11 @@ def train_model_down(model_down, o1, ps1_mean, ps1_logvar, omega, optimizer):
     ps1_logvar_stopped = tf.stop_gradient(ps1_logvar)
     omega_stopped = tf.stop_gradient(omega)
     with tf.GradientTape() as tape:
+        clip_value = 1.0
         F, _, _, _ = compute_loss_down(model_down=model_down, o1=o1, ps1_mean=ps1_mean_stopped, ps1_logvar=ps1_logvar_stopped, omega=omega_stopped)
         gradients = tape.gradient(F, model_down.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, model_down.trainable_variables))
+        # TODO: Find reason why gradients go to 1e+19 ????
+        print(gradients)
+        clipped_gradients = [tf.clip_by_value(grad, -clip_value, clip_value) for grad in gradients]
+        optimizer.apply_gradients(zip(clipped_gradients, model_down.trainable_variables))
+
