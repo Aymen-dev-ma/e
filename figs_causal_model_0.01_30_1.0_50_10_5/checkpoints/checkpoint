@@ -1,0 +1,2 @@
+model_checkpoint_path: "optimizer_down-1"
+all_model_checkpoint_paths: "optimizer_down-1"
