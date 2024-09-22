@@ -27,12 +27,11 @@ c: This moves the steepness of the sigmoid
 d: This is the minimum omega (when sigmoid is zero)
 '''
 var_a = 1.0;         var_b = 25.0;          var_c = 5.0;         var_d = 1.5
-s_dim = 10;          o_dim = 3;             pi_dim = 5;
-beta_s = 1.0;        beta_o = 1.0;
+s_dim = 10;          pi_dim = 4;            beta_s = 1.0;        beta_o = 1.0;
 gamma = 0.0;         gamma_rate = 0.01;     gamma_max = 0.8;     gamma_delay = 30
 deepness = 1;        samples = 1;           repeats = 5
 l_rate_top = 1e-04;  l_rate_mid = 1e-04;    l_rate_down = 0.001
-ROUNDS = 1000;       TEST_SIZE = 1000;      epochs = 1000
+ROUNDS = 1000;       TEST_SIZE = 1000;      epochs = 60
 
 signature = 'final_model_'
 signature += str(gamma_rate)+'_'+str(gamma_delay)+'_'+str(var_a)+'_'+str(args.batch)+'_'+str(s_dim)+'_'+str(repeats)
@@ -46,7 +45,7 @@ except: print('Folder chp creation error')
 
 games = Game(args.batch)
 game_test = Game(1)
-model = ActiveInferenceModel(s_dim=s_dim, pi_dim=pi_dim, gamma=gamma, beta_s=beta_s, beta_o=beta_o, o_dim=3)
+model = ActiveInferenceModel(s_dim=s_dim, pi_dim=pi_dim, gamma=gamma, beta_s=beta_s, beta_o=beta_o, colour_channels=1, resolution=64)
 
 stats_start = {'F':[], 'F_top':[], 'F_mid':[], 'F_down':[], 'mse_o':[], 'TC':[], 'kl_div_s':[],
    'kl_div_s_anal':[], 'omega':[], 'learning_rate':[], 'current_lr':[], 'mse_r':[],
@@ -69,12 +68,10 @@ else:
     start_epoch = 1
     optimizers = {}
 
-AdamOptimizer = tf.keras.optimizers.legacy.Adam # use legacy for mac support
-
 if optimizers == {}:
-    optimizers['top'] = AdamOptimizer(learning_rate=l_rate_top)
-    optimizers['mid'] = AdamOptimizer(learning_rate=l_rate_mid)
-    optimizers['down'] = AdamOptimizer(learning_rate=l_rate_down)
+    optimizers['top'] = tf.keras.optimizers.Adam(learning_rate=l_rate_top)
+    optimizers['mid'] = tf.keras.optimizers.Adam(learning_rate=l_rate_mid)
+    optimizers['down'] = tf.keras.optimizers.Adam(learning_rate=l_rate_down)
 
 start_time = time.time()
 for epoch in range(start_epoch, epochs + 1):
@@ -83,19 +80,9 @@ for epoch in range(start_epoch, epochs + 1):
 
     train_scores = np.zeros(ROUNDS)
     for i in range(ROUNDS):
-        # TODO: fix the code then delete these statements
-        print("GAME ROUND", i)
-        tf.config.run_functions_eagerly(True)
-
         # -- MAKE TRAINING DATA FOR THIS BATCH ---------------------------------
-        games.randomize_environment_all() # why is it randomising the whole thing each round?
-        print("make sprites")
+        games.randomize_environment_all()
         o0, o1, pi0, log_Ppi = u.make_batch_dsprites_active_inference(games=games, model=model, deepness=deepness, samples=samples, calc_mean=True, repeats=repeats)
-        print("training")
-
-        print("Transition States")
-        print(o0[..., 0])
-        print(o1[..., 0])
 
         # -- TRAIN TOP LAYER ---------------------------------------------------
         qs0,_,_ = model.model_down.encoder_with_sample(o0)
@@ -105,7 +92,6 @@ for epoch in range(start_epoch, epochs + 1):
         current_omega = loss.compute_omega(D_KL_pi, a=var_a, b=var_b, c=var_c, d=var_d).reshape(-1,1)
 
         # -- TRAIN MIDDLE LAYER ------------------------------------------------
-        print("second encoding")
         qs1_mean, qs1_logvar = model.model_down.encoder(o1)
         ps1_mean, ps1_logvar = loss.train_model_mid(model_mid=model.model_mid, s0=qs0, qs1_mean=qs1_mean, qs1_logvar=qs1_logvar, Ppi_sampled=pi0, omega=current_omega, optimizer=optimizers['mid'])
 
@@ -153,7 +139,13 @@ for epoch in range(start_epoch, epochs + 1):
     stats['var_d'].append(var_d)
     stats['TC'].append(np.mean(total_correlation(qs1.numpy())))
     stats['learning_rate'].append(optimizers['down'].lr.numpy())
-    stats['current_lr'].append(optimizers['down']._decayed_lr(tf.float32).numpy())
+    lr_schedule = optimizers['down'].learning_rate
+    if isinstance(lr_schedule, tf.keras.optimizers.schedules.LearningRateSchedule):
+        current_lr = lr_schedule(optimizers['down'].iterations).numpy()
+    else:
+        current_lr = lr_schedule.numpy()
+
+    stats['current_lr'].append(current_lr)
 
     generate_traversals(model=model, s_dim=s_dim, s_sample=s0, S_real=S0_real,
                         filenames=[folder+'/traversals_at_epoch_{:04d}.png'.format(epoch)], colour=False)

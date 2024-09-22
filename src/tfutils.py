@@ -3,8 +3,6 @@ import numpy as np
 
 log_2_pi = np.log(2.0*np.pi)
 
-OBS_AXES = [1]
-
 def kl_div_loss_analytically_from_logvar_and_precision(mu1, logvar1, mu2, logvar2, omega):
     return 0.5*(logvar2 - tf.math.log(omega) - logvar1) + (tf.exp(logvar1) + tf.math.square(mu1 - mu2)) / (2.0 * tf.exp(logvar2) / omega) - 0.5
 
@@ -21,11 +19,6 @@ def entropy_normal_from_logvar(logvar):
 
 def entropy_bernoulli(p, displacement = 0.00001):
     return - (1-p)*tf.math.log(displacement + 1 - p) - p*tf.math.log(displacement + p)
-
-def entropy_obs(p):
-    # TODO: determine how to calculate entropy in a good way?
-    #return entropy_bernoulli(p)
-    return tf.zeros_like(p)
 
 def log_bernoulli(x, p, displacement = 0.00001):
     return x*tf.math.log(displacement + p) + (1-x)*tf.math.log(displacement + 1 - p)
